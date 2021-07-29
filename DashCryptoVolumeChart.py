@@ -31,9 +31,7 @@ from dash.dependencies import Input, Output
 api = krakenex.API()
 k = KrakenAPI(api)
 public_client = cbpro.PublicClient()
-"""
-    Bitfinex API
-"""
+# bitfinex api
 api_v2 = bitfinex.bitfinex_v2.api_v2()
 
 class DataFrames():
@@ -42,14 +40,12 @@ class DataFrames():
         self.interval = '1m'
         # pair is BTC/USD byt default
         self.pair = 'DOGE'
-        #
-        # function calls that returns a data frame and stores into instance variables
+        # creating instance variables that hold no value
         self.kraken_df = ""
         self.bitfinex_df = ""
         self.cbpro_df = ""
         self.binance_df = ""
         self.gemini_df = ""
-        #print(self.kraken_df)
 
     # updates data to current time frame
     def refreshDataFrames(self, pair = 'BTC'):
@@ -73,13 +69,11 @@ class DataFrames():
             df = df.astype('float')
             # converting millisecond time stamp into date time
             df['Date'] = pd.to_datetime(df['Date'], unit='ms')
-            #print("gemini",df)
             return df
         except ValueError:
             columns = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
             dff = pd.DataFrame(columns=columns)
             return dff
-
     """
         BinanceDataFrame():
             - Generates data frame containing crypto historical data.
@@ -113,7 +107,6 @@ class DataFrames():
             df['Date'] = pd.to_datetime(df['Date'], unit='ms')
             # reverse order of data frame
             df = df.iloc[::-1]
-            #print("binance",df)
             return df
         except ValueError:
             columns = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
@@ -126,9 +119,6 @@ class DataFrames():
             - New data is sent every 5 mins.
     """
     def CoinbaseProDataFrame(self, interval):
-        #startTime = dt.datetime.now() - dt.timedelta(minutes=200)
-        # end time is one year from current date
-        #endTime = str(dt.datetime.now())
         # retrieving historical data using Coinbase Pro Api
         df = public_client.get_product_historic_rates(product_id=self.pair+"-USD",granularity=60)
         # renaming columns
@@ -136,8 +126,6 @@ class DataFrames():
         df = pd.DataFrame(data=df,columns=columns)
         # converting timestamp from seconds to date time %Y-%m-d
         df['Date'] = pd.to_datetime(df['Date'], unit='s')
-        #df = df.iloc[::-1]
-        #print("coinbase",df)
         return df
     """
         KrakenDataFrame():
@@ -153,7 +141,6 @@ class DataFrames():
             df.columns = ['Date', 'Open', 'High', 'Low', 'Close', 'VWAP', 'Volume', 'Count']
             # reverse order of data frame
             df = df.iloc[::-1]
-            #print("kraken",df)
             return df
         else:
             columns = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
@@ -181,15 +168,24 @@ class DataFrames():
         # changing timestamp dates from milliseconds to %Y-%m-%d 00:00:00
         df['Date'] = pd.to_datetime(df['Date'], unit='ms')
         # return data update data frame
-        #print("bitfinex",df)
         return df
+
+# DataFrames() object which data will be accessed from,
 df = DataFrames()
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+# list of tokens that are found on dropdown.
 token_list = ['BTC','ETH','ADA','DOGE','BNB','XRP']
+# layout of trading volume app
 app.layout = html.Div(
     html.Div(
         [
+            html.H1(id='header',
+                    style={'position':'absolute',
+                           'top':'2%',
+                           'left':'3.5%',
+                           }
+                    ),
             html.Div(
                   children=[
                       html.H6("Update Charts:",
@@ -230,7 +226,7 @@ app.layout = html.Div(
                         value='BTC',
                         multi=False,
                         style={"display": "inline-block",
-                               "width":'20vh',
+                               "width":'25vh',
                                'position':'absolute',
                                'left':"35%",
                                "top": '5%'
@@ -293,26 +289,36 @@ app.layout = html.Div(
         ],
     )
 )#main Div
-
+"""
+    First Callback:
+        - Output 1: returns a bar chart figure to a data core component graph.
+        - Output 2: returns a pie chart figure to a data core component graph.
+        - Output 3: returns a string of the current crypto token that is plotted.
+        - Input 1: receives input from a dropdown and passes the token value to our method.
+        - Input 2: receives input when user clicks the refresh button to update chart.
+        - Method: createFigures()
+                    - takes in dropdown value and refresh button clicks.
+                    - creates and updates data frames from callbacks inputs.
+                    - gathers total volume from each crypto exchange and calculates distribution of volume.
+                    - returns: bar chart figure, pie chart figure, and current token name to header.
+"""
 @app.callback(
     Output(component_id='bar-graph',component_property='figure'),
     Output(component_id='pie-chart',component_property='figure'),
+    Output(component_id='header',component_property='children'),
     [Input(component_id='token-dropdown',component_property='value'),
      Input(component_id='refresh-button',component_property='n_clicks'),]
 )
-def barChart(value,refresh_clicks):
+def createFigures(value,refresh_clicks):
     if refresh_clicks != None or value is not None:
+        print(value)
         df.refreshDataFrames(value)
     # data frame list
     data_frame_list = [df.kraken_df,df.bitfinex_df,df.cbpro_df,df.binance_df,df.gemini_df]
+    # data frame list is used to calculate the total volume of each data frame using a 30 minute interval.
     for i in range(len(data_frame_list)):
         data_frame_list[i] = sum(data_frame_list[i]['Volume'].iloc[0:30])
     # making copies of data frames
-    #bit = None if df.bitfinex_df is None else (df.bitfinex_df.copy()).iloc[0:30]
-    #bin = None if df.binance_df is None else (df.binance_df.copy()).iloc[0:30]
-    #cbp = None if df.cbpro_df is None else (df.cbpro_df.copy()).iloc[0:30]
-    #kra = None if df.kraken_df is None else (df.kraken_df.copy()).iloc[0:30]
-    #gem = None if df.gemini_df is None else (df.gemini_df.copy()).iloc[0:30]
     bit = (df.bitfinex_df.copy()).iloc[0:30] # copy of bitfinex data frame
     bin = (df.binance_df.copy()).iloc[0:30] # copy of binance data frame
     cbp = (df.cbpro_df.copy()).iloc[0:30] # copy of coinbase pro data frame
@@ -320,6 +326,7 @@ def barChart(value,refresh_clicks):
     gem = (df.gemini_df.copy()).iloc[0:30] # copy of gemini data frame
     # creating list of values and list of exchange names.
     exchanges = ['Kraken','Bitfinex','Coinbase Pro','Binance','Gemini']
+    # pie chart figure
     pie_fig = go.Figure(
         data=[
             go.Pie(
@@ -328,6 +335,7 @@ def barChart(value,refresh_clicks):
             )
         ]
     )
+    # bar chart figure
     bar_fig = go.Figure(
         data=[
             go.Bar(
@@ -357,6 +365,7 @@ def barChart(value,refresh_clicks):
             ),
         ]
     )
+    # configuring pie chart legend placement
     pie_fig.update_layout(
         legend=dict(orientation='h',
                     yanchor='bottom',
@@ -365,8 +374,10 @@ def barChart(value,refresh_clicks):
                     x=.88,
                     )
     )
+    # configuring bar chart legend placement
+    # adding title to chart and axis labels
     bar_fig.update_layout(
-        title=df.pair + "/USD Volume Chart",
+        title=df.pair + "/USD",
         yaxis_title="Volume",
         barmode='stack',
         legend=dict(orientation='h',
@@ -376,8 +387,10 @@ def barChart(value,refresh_clicks):
                     x=.94
                     )
     )
-    return bar_fig, pie_fig
-
+    return bar_fig, pie_fig, "{}/USD Trading Volume".format(value)
+"""
+    main()
+        - Uses Plotly Dash app to build charts.
+"""
 if __name__ == '__main__':
-    #pass
     app.run_server(debug=True)
